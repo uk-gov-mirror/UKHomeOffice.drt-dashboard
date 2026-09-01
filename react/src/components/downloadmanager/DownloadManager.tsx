@@ -13,8 +13,8 @@ import {
   SelectChangeEvent,
 } from "@mui/material"
 
-import {DatePicker} from '@mui/x-date-pickers/DatePicker'
-import moment, {Moment} from 'moment'
+import {DatePicker, IsoDate} from '@drt/drt-react'
+import moment from 'moment'
 import DownloadPorts from './DownloadPorts'
 import DownloadModal from './DownloadModal'
 
@@ -28,8 +28,8 @@ import {adminPageTitleSuffix} from "../../utils/common"
 import PageContentWrapper from '../PageContentWrapper'
 
 interface DownloadDates {
-  start: Moment
-  end: Moment
+  start: IsoDate | null
+  end: IsoDate | null
 }
 
 interface ErrorFieldMapping {
@@ -43,11 +43,11 @@ interface DownloadManagerProps {
   user: UserProfile
   config: ConfigValues
   errors: FormError[]
-  requestDownload: (ports: PortTerminal[], exportType: string, startDate: Moment, endDate: Moment) => void
+  requestDownload: (ports: PortTerminal[], exportType: string, startDate: IsoDate | null, endDate: IsoDate | null) => void
   checkDownloadStatus: (createdAt: string) => void
 }
 
-const DownloadManager = ({
+export const DownloadManager = ({
                            status,
                            createdAt,
                            downloadUrl,
@@ -60,8 +60,8 @@ const DownloadManager = ({
   const [modalOpen, setModalOpen] = React.useState<boolean>(false)
   const [selectedPorts, setSelectedPorts] = React.useState<string[]>([])
   const [dates, setDate] = React.useState<DownloadDates>({
-    start: moment(),
-    end: moment(),
+    start: moment().format('YYYY-MM-DD'),
+    end: moment().format('YYYY-MM-DD'),
   })
   const [exportType, setExportType] = React.useState<string>('passengers-port')
   const [daily, setDaily] = React.useState<boolean>(false)
@@ -72,6 +72,10 @@ const DownloadManager = ({
 
   const errorFieldMapping: ErrorFieldMapping = {}
   errors.forEach((error: FormError) => errorFieldMapping[error.field] = true)
+
+  const errorFor = (field: string): string | undefined => {
+    return errors.find((error: FormError) => error.field === field)?.message
+  }
 
   let interval: { current: ReturnType<typeof setInterval> | null | any } = React.useRef(null)
 
@@ -94,7 +98,7 @@ const DownloadManager = ({
     return {...region, ports: userPorts} as PortRegion
   }).filter(r => r.ports.length > 0 || isRccRegion(r.name))
 
-  const onDateChange = (type: string, date: Moment | null) => {
+  const onDateChange = (type: 'start' | 'end', date: IsoDate | null) => {
     setDate({
       ...dates,
       [type]: date
@@ -147,10 +151,7 @@ const DownloadManager = ({
   }
 
   const disablePassengerExportType = (): boolean => {
-    const cleanStart = moment(dates.start.format('YYYY-MM-DD'))
-    const cleanEnd = moment(dates.end.format('YYYY-MM-DD'))
-    const rangeInDays = cleanStart.diff(cleanEnd, 'days')
-    return (exportType == 'arrivals') || (Math.abs(rangeInDays) == 0)
+    return (exportType == 'arrivals') || !dates.start || !dates.end || dates.start === dates.end
   }
 
   const handleSubmit = (): void => {
@@ -188,23 +189,27 @@ const DownloadManager = ({
       <Box sx={{backgroundColor: '#E6E9F1', p: 2}}>
         <Box>
           <h3>Date Range</h3>
-          <DatePicker
-            slotProps={{
-              textField: {error: errorFieldMapping.startDate}
-            }}
-            label="Start"
-            sx={{backgroundColor: '#fff', marginRight: '10px'}}
-            value={dates.start}
-            onChange={(newValue: Moment | null) => onDateChange('start', newValue)}/>
+          <Box sx={{display: 'flex', gap: '10px', alignItems: 'flex-start', flexWrap: 'wrap'}}>
+            <DatePicker
+              id="download-manager-start-date"
+              name="startDate"
+              label="Start"
+              value={dates.start}
+              onChange={(newValue) => onDateChange('start', newValue)}
+              maxDate={dates.end ?? undefined}
+              error={errorFor('startDate')}
+            />
 
-          <DatePicker
-            slotProps={{
-              textField: {error: errorFieldMapping.endDate}
-            }}
-            label="End"
-            sx={{backgroundColor: '#fff'}}
-            value={dates.end}
-            onChange={(newValue: Moment | null) => onDateChange('end', newValue)}/>
+            <DatePicker
+              id="download-manager-end-date"
+              name="endDate"
+              label="End"
+              value={dates.end}
+              onChange={(newValue) => onDateChange('end', newValue)}
+              minDate={dates.start ?? undefined}
+              error={errorFor('endDate')}
+            />
+          </Box>
         </Box>
 
         <DownloadPorts
@@ -267,8 +272,8 @@ const mapDispatch = (dispatch: MapDispatchToProps<any, DownloadManagerProps>) =>
     checkDownloadStatus: (createdAt: string) => {
       dispatch(checkDownloadStatus(createdAt))
     },
-    requestDownload: (ports: PortTerminal[], exportType: string, startDate: Moment, endDate: Moment) => {
-      dispatch(requestDownload(ports, exportType, startDate.format('YYYY-MM-DD'), endDate.format('YYYY-MM-DD')))
+    requestDownload: (ports: PortTerminal[], exportType: string, startDate: IsoDate | null, endDate: IsoDate | null) => {
+      dispatch(requestDownload(ports, exportType, startDate ?? '', endDate ?? ''))
     },
   }
 }

@@ -153,11 +153,14 @@ export function totalFromQueues(dp: QueueCount[]) {
 
 export function* handleRequestPaxTotals(action: RequestPaxTotalsType) {
   try {
+    const start = moment(action.forecastStart, 'YYYY-MM-DD', true)
+    const end = action.singleOrRange === 'single' ? start.clone() : moment(action.forecastEnd, 'YYYY-MM-DD', true).endOf('day')
+    const historicStart = moment(action.historicStart, 'YYYY-MM-DD', true)
+    const historicEnd = action.singleOrRange === 'single' ? historicStart.clone() : moment(action.historicEnd, 'YYYY-MM-DD', true).endOf('day')
+
+    if (!start.isValid() || !end.isValid() || !historicStart.isValid() || !historicEnd.isValid()) return
+
     yield(put(setStatus('loading')))
-    const start = moment(action.forecastStart)
-    const end = action.singleOrRange === 'single' ? start : moment(action.forecastEnd).endOf('day')
-    const historicStart = moment(action.historicStart)
-    const historicEnd = action.singleOrRange === 'single' ? historicStart : moment(action.historicEnd).endOf('day')
 
     const forecastStart = start.format('YYYY-MM-DD')
     const forecastEnd = end.format('YYYY-MM-DD')

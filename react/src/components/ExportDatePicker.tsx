@@ -1,12 +1,9 @@
 import * as React from 'react';
-import {LocalizationProvider} from '@mui/x-date-pickers/LocalizationProvider';
-import {DatePicker} from '@mui/x-date-pickers/DatePicker';
 import Button from '@mui/material/Button';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import {Stack} from "@mui/material";
 import axios from "axios";
-import {AdapterMoment} from "@mui/x-date-pickers/AdapterMoment";
-import {Moment} from "moment";
+import {DatePicker, IsoDate} from '@drt/drt-react';
 import ApiClient from "../services/ApiClient";
 
 interface IProps {
@@ -21,43 +18,48 @@ interface RegionExportRequest {
 }
 
 export default function ExportDatePicker(props: IProps) {
-  const [fromValue, setFromValue] = React.useState<Moment | null>(null);
-  const [toValue, setToValue] = React.useState<Moment | null>(null);
+  const [fromValue, setFromValue] = React.useState<IsoDate | null>(null);
+  const [toValue, setToValue] = React.useState<IsoDate | null>(null);
 
-  const formattedDate = (date: Moment) => date.format("yyyy-MM-DD")
+  const rangeError = fromValue && toValue && fromValue > toValue
+    ? 'The end date must be after the start date.'
+    : undefined;
 
   const requestExport = () => {
-    fromValue && toValue && axios.post(
+    fromValue && toValue && !rangeError && axios.post(
       ApiClient.exportRegionEndpoint,
       {
         region: props.region,
-        startDate: formattedDate(fromValue),
-        endDate: formattedDate(toValue),
+        startDate: fromValue,
+        endDate: toValue,
       } as RegionExportRequest,
     )
     props.handleClose()
   }
 
-  return <LocalizationProvider dateAdapter={AdapterMoment} adapterLocale={'en-gb'}>
+  return <>
     <Stack spacing={2} sx={{mt: 2}}>
       <DatePicker
+        id="export-start-date"
         label="From Date"
         value={fromValue}
-        onChange={(newValue) => setFromValue(newValue)}
-        slotProps={{textField: {variant: 'outlined'}}}
+        onChange={setFromValue}
+        error={rangeError}
       />
       <DatePicker
+        id="export-end-date"
         label="To Date"
         value={toValue}
-        onChange={(newValue) => setToValue(newValue)}
-        slotProps={{textField: {variant: 'outlined'}}}
+        onChange={setToValue}
+        minDate={fromValue ?? undefined}
+        error={rangeError}
       />
       <Button startIcon={<FileDownloadIcon/>}
-              disabled={!fromValue || !toValue}
+              disabled={!fromValue || !toValue || !!rangeError}
               onClick={requestExport}
       >
         Request export
       </Button>
     </Stack>
-  </LocalizationProvider>
+  </>
 }

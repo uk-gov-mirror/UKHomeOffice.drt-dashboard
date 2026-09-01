@@ -2,11 +2,10 @@ import * as React from 'react'
 import {connect, MapDispatchToProps} from 'react-redux'
 import {RootState} from '../../store/redux'
 import {Grid} from '@mui/material'
-import {Radios} from '@drt/drt-react'
-import {DatePicker} from '@mui/x-date-pickers/DatePicker'
+import {DatePicker, IsoDate, Radios} from '@drt/drt-react'
 import {requestPaxTotals} from './regionalPressureSagas'
 import moment, {Moment} from 'moment'
-import {ErrorFieldMapping, FormError} from '../../services/ValidationService'
+import {FormError} from '../../services/ValidationService'
 import {getHistoricDateByDay} from "./regionalPressureState";
 
 interface RegionalPressureFormProps {
@@ -24,8 +23,17 @@ interface RegionalPressureFormProps {
 }
 
 interface RegionalPressureDatesState {
-    start: Moment
-    end: Moment
+    start: IsoDate | null
+    end: IsoDate | null
+}
+
+const toIsoDate = (date: Moment): IsoDate => date.format('YYYY-MM-DD')
+const toMoment = (date: IsoDate): Moment => moment(date, 'YYYY-MM-DD', true)
+const toInitialIsoDate = (date: string): IsoDate | null => {
+    const legacyDate = date.replace(/ \(.+\)$/, '')
+    const parsedDate = moment(legacyDate, ['YYYY-MM-DD', 'ddd MMM DD YYYY HH:mm:ss [GMT]ZZ'], true)
+
+    return parsedDate.isValid() ? toIsoDate(parsedDate) : null
 }
 
 export const RegionalPressureForm = ({
@@ -43,73 +51,74 @@ export const RegionalPressureForm = ({
     const [searchType, setSearchType] = React.useState<'single' | 'range'>(singleOrRange)
     const [comparisonType, setComparisonType] = React.useState<'previousYear' | 'custom'>(initialComparisonType)
     const [forecastDates, setForecastDates] = React.useState<RegionalPressureDatesState>({
-        start: moment(forecastStart),
-        end: moment(forecastEnd),
+        start: toInitialIsoDate(forecastStart),
+        end: toInitialIsoDate(forecastEnd),
     })
     const [historicDates, setHistoricDates] = React.useState<RegionalPressureDatesState>({
-        start: moment(historicStart),
-        end: moment(historicEnd),
+        start: toInitialIsoDate(historicStart),
+        end: toInitialIsoDate(historicEnd),
     })
-    const errorFieldMapping: ErrorFieldMapping = {}
-    errors.forEach((error: FormError) => errorFieldMapping[error.field] = true)
+    const errorFor = (field: string) => errors.find((error: FormError) => error.field === field)?.message
+    const forecastRangeError = forecastDates.start && forecastDates.end && forecastDates.start > forecastDates.end
+        ? 'The end date must be after the start date.'
+        : undefined
+    const requestRegionIfComplete = (
+        nextSearchType = searchType,
+        nextComparisonType = comparisonType,
+        nextForecastDates = forecastDates,
+        nextHistoricDates = historicDates,
+    ): boolean => {
+        if (!nextForecastDates.start || !nextHistoricDates.start) return false
+        if (nextSearchType === 'range' && (!nextForecastDates.end || !nextHistoricDates.end)) return false
 
-    React.useEffect(() => {
         requestRegion(
             ports,
             availablePorts,
-            searchType,
-            comparisonType,
-            forecastDates.start.format('YYYY-MM-DD'),
-            forecastDates.end.format('YYYY-MM-DD'),
+            nextSearchType,
+            nextComparisonType,
+            nextForecastDates.start,
+            nextForecastDates.end ?? nextForecastDates.start,
             false,
-            historicDates.start.format('YYYY-MM-DD'),
-            historicDates.end.format('YYYY-MM-DD'),
+            nextHistoricDates.start,
+            nextHistoricDates.end ?? nextHistoricDates.start,
         )
+
+        return true
+    }
+
+    React.useEffect(() => {
+        requestRegionIfComplete()
     }, [])
 
     const handleSearchTypeChange = (value: string) => {
         const singleOrRange = value as 'single' | 'range';
         setSearchType(singleOrRange)
-        requestRegion(
-            ports,
-            availablePorts,
-            singleOrRange,
-            comparisonType,
-            forecastDates.start.format('YYYY-MM-DD'),
-            forecastDates.end.format('YYYY-MM-DD'),
-            false,
-            historicDates.start.format('YYYY-MM-DD'),
-            historicDates.end.format('YYYY-MM-DD'),
-        )
+        requestRegionIfComplete(singleOrRange)
     }
 
-    const handleDateChange = (type: string, date: Moment) => {
-        const forecastStart: Moment = type == 'start' ? date : forecastDates.start
-        const forecastEnd = type == 'end' ? date : forecastDates.end
-        const historicStart = comparisonType == 'previousYear' ? getHistoricDateByDay(forecastStart) : historicDates.start
-        const historicEnd = comparisonType == 'previousYear' ? getHistoricDateByDay(forecastEnd) : historicDates.end
+    const handleDateChange = (type: 'start' | 'end', date: IsoDate | null) => {
+        const forecastStart = type === 'start' ? date : forecastDates.start
+        const forecastEnd = type === 'end' ? date : forecastDates.end
 
         setForecastDates({
             start: forecastStart,
             end: forecastEnd
         })
 
-        setHistoricDates({
+        const historicStart = comparisonType === 'previousYear'
+            ? forecastStart && toIsoDate(getHistoricDateByDay(toMoment(forecastStart)))
+            : historicDates.start
+        const historicEnd = comparisonType === 'previousYear'
+            ? forecastEnd && toIsoDate(getHistoricDateByDay(toMoment(forecastEnd)))
+            : historicDates.end
+
+        const nextHistoricDates = {
             start: historicStart,
             end: historicEnd
-        })
+        }
 
-        requestRegion(
-            ports,
-            availablePorts,
-            searchType,
-            comparisonType,
-            forecastStart.format('YYYY-MM-DD'),
-            forecastEnd.format('YYYY-MM-DD'),
-            false,
-            historicStart.format('YYYY-MM-DD'),
-            historicEnd.format('YYYY-MM-DD'),
-        )
+        setHistoricDates(nextHistoricDates)
+        requestRegionIfComplete(searchType, comparisonType, {start: forecastStart, end: forecastEnd}, nextHistoricDates)
     }
 
     const handleComparisonTypeChange = (value: string) => {
@@ -117,51 +126,37 @@ export const RegionalPressureForm = ({
 
         const historicStart = comparisonType === 'custom' ?
             historicDates.start :
-            getHistoricDateByDay(forecastDates.start)
+            forecastDates.start && toIsoDate(getHistoricDateByDay(toMoment(forecastDates.start)))
 
         const historicEnd = comparisonType === 'custom' ?
             historicDates.end :
-            getHistoricDateByDay(forecastDates.end)
+            forecastDates.end && toIsoDate(getHistoricDateByDay(toMoment(forecastDates.end)))
 
         setComparisonType(comparisonType)
-        setHistoricDates({
+        const nextHistoricDates = {
             start: historicStart,
             end: historicEnd
-        })
-
-        requestRegion(
-            ports,
-            availablePorts,
-            searchType,
-            comparisonType,
-            forecastDates.start.format('YYYY-MM-DD'),
-            forecastDates.end.format('YYYY-MM-DD'),
-            false,
-            historicStart.format('YYYY-MM-DD'),
-            historicEnd.format('YYYY-MM-DD'),
-        )
+        }
+        setHistoricDates(nextHistoricDates)
+        requestRegionIfComplete(searchType, comparisonType, forecastDates, nextHistoricDates)
     }
 
-    const handleComparisonDateChange = (type: string, comparisonDate: Moment) => {
-        const duration = moment.duration(forecastDates.end.diff(forecastDates.start)).asHours()
-        const comparisonEnd = moment(comparisonDate).add(duration, 'hours')
+    const handleComparisonDateChange = (comparisonDate: IsoDate | null) => {
+        if (!comparisonDate || !forecastDates.start || (searchType === 'range' && !forecastDates.end)) {
+            setHistoricDates({start: comparisonDate, end: null})
+            return
+        }
+
+        const forecastEnd = forecastDates.end ?? forecastDates.start
+        const duration = moment.duration(toMoment(forecastEnd).diff(toMoment(forecastDates.start))).asHours()
+        const comparisonEnd = toIsoDate(toMoment(comparisonDate).add(duration, 'hours'))
 
         setHistoricDates({
             start: comparisonDate,
             end: comparisonEnd
         })
 
-        requestRegion(
-            ports,
-            availablePorts,
-            searchType,
-            comparisonType,
-            forecastDates.start.format('YYYY-MM-DD'),
-            forecastDates.end.format('YYYY-MM-DD'),
-            false,
-            comparisonDate.format('YYYY-MM-DD'),
-            comparisonEnd.format('YYYY-MM-DD'),
-        )
+        requestRegionIfComplete(searchType, comparisonType, forecastDates, {start: comparisonDate, end: comparisonEnd})
     }
 
     return (
@@ -185,24 +180,24 @@ export const RegionalPressureForm = ({
             <Grid container spacing={2} justifyItems={'stretch'} sx={{mb: 2}}>
                 <Grid item>
                     <DatePicker
-                        slotProps={{
-                            textField: {error: errorFieldMapping.startDate}
-                        }}
+                        id="regional-pressure-forecast-start"
+                        name="startDate"
                         label={searchType == 'single' ? "Date" : "From"}
-                        sx={{backgroundColor: '#fff', marginRight: '10px'}}
                         value={forecastDates.start}
-                        onChange={(newValue: Moment | null) => handleDateChange('start', newValue || moment())}/>
+                        onChange={(newValue) => handleDateChange('start', newValue)}
+                        error={errorFor('startDate')}
+                        maxDate={forecastDates.end ?? undefined}/>
                 </Grid>
                 {searchType === 'range' &&
                     <Grid item>
                         <DatePicker
-                            slotProps={{
-                                textField: {error: errorFieldMapping.endDate}
-                            }}
+                            id="regional-pressure-forecast-end"
+                            name="endDate"
                             label="To"
-                            sx={{backgroundColor: '#fff'}}
                             value={forecastDates.end}
-                            onChange={(newValue: Moment | null) => handleDateChange('end', newValue || moment())}/>
+                            onChange={(newValue) => handleDateChange('end', newValue)}
+                            error={forecastRangeError || errorFor('endDate')}
+                            minDate={forecastDates.start ?? undefined}/>
                     </Grid>
                 }
             </Grid>
@@ -227,22 +222,19 @@ export const RegionalPressureForm = ({
                 <Grid container spacing={2} justifyItems={'stretch'} sx={{mb: 2}}>
                     <Grid item>
                         <DatePicker
-                            slotProps={{
-                                textField: {error: errorFieldMapping.startDate}
-                            }}
+                            id="regional-pressure-historic-start"
+                            name="historicStartDate"
                             label={searchType == 'single' ? "Date" : "From"}
-                            sx={{backgroundColor: '#fff', marginRight: '10px'}}
                             value={historicDates.start}
-                            onChange={(newValue: Moment | null) => handleComparisonDateChange('start', newValue || moment())}/>
+                            onChange={handleComparisonDateChange}
+                            error={errorFor('startDate')}/>
                     </Grid>
                     {searchType === 'range' && <Grid item>
                         <DatePicker
+                            id="regional-pressure-historic-end"
+                            name="historicEndDate"
                             disabled={true}
-                            slotProps={{
-                                textField: {error: errorFieldMapping.endDate}
-                            }}
                             label="To"
-                            sx={{backgroundColor: '#fff'}}
                             value={historicDates.end}/>
                     </Grid>}
                 </Grid>
