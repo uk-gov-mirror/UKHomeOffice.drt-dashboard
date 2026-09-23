@@ -1229,9 +1229,9 @@
   dependencies:
     "@date-io/core" "^2.17.0"
 
-"@drt/drt-react@github:UKHomeOffice/drt-react#v2.6.0":
-  version "2.6.0"
-  resolved "git+ssh://git@github.com/UKHomeOffice/drt-react.git#6d632c58765a163855cbbd335787d2b053998590"
+"@drt/drt-react@github:UKHomeOffice/drt-react#v2.9.0":
+  version "2.9.0"
+  resolved "git+ssh://git@github.com/UKHomeOffice/drt-react.git#f4776abefb0dac0eb79db4a0259fd7b05ddf7f8c"
   dependencies:
     "-" "^0.0.1"
     "@emotion/react" "^11.11.4"

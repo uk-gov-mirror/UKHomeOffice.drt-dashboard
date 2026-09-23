@@ -95,3 +95,4 @@ describe('<DownloadManager />', () => {
     expect(getByLabelText('Daily passenger breakdown')).toBeDisabled()
   })
 })
+

@@ -5,7 +5,6 @@ import {
   AlertTitle,
   Box,
   Button,
-  Checkbox,
   FormControl,
   FormControlLabel,
   Radio,
@@ -26,6 +25,7 @@ import {FormError} from '../../services/ValidationService'
 import {Helmet} from "react-helmet"
 import {adminPageTitleSuffix} from "../../utils/common"
 import PageContentWrapper from '../PageContentWrapper'
+import {Checkboxes} from '@drt/drt-react'
 
 interface DownloadDates {
   start: IsoDate | null
@@ -48,15 +48,15 @@ interface DownloadManagerProps {
 }
 
 export const DownloadManager = ({
-                           status,
-                           createdAt,
-                           downloadUrl,
-                           errors,
-                           requestDownload,
-                           user,
-                           config,
-                           checkDownloadStatus
-                         }: DownloadManagerProps) => {
+                                  status,
+                                  createdAt,
+                                  downloadUrl,
+                                  errors,
+                                  requestDownload,
+                                  user,
+                                  config,
+                                  checkDownloadStatus
+                                }: DownloadManagerProps) => {
   const [modalOpen, setModalOpen] = React.useState<boolean>(false)
   const [selectedPorts, setSelectedPorts] = React.useState<string[]>([])
   const [dates, setDate] = React.useState<DownloadDates>({
@@ -122,32 +122,7 @@ export const DownloadManager = ({
   }
 
   const handleRemovePort = (port: string) => {
-    setSelectedPorts(selectedPorts.filter(p => p !== port))
-  }
-
-  const handlePortCheckboxChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const {
-      target: {name},
-    } = event
-    setSelectedPorts(selectedPorts.includes(name) ? selectedPorts.filter(port => port !== name) : [...selectedPorts, name])
-  }
-
-  const handlePortCheckboxGroupChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const {
-      target: {name, checked},
-    } = event
-    const region = userPortsByRegion.filter(region => region.name === name)[0]
-    if (checked) {
-      // add all in region
-      const newSelection = [...selectedPorts, ...region.ports]
-      const deduped = newSelection.filter((element, index) => {
-        return newSelection.indexOf(element) === index
-      })
-      setSelectedPorts(deduped)
-    } else {
-      // remove any selected from region
-      setSelectedPorts(selectedPorts.filter(port => !region.ports.includes(port)))
-    }
+    setSelectedPorts(ports => ports.filter(p => p !== port))
   }
 
   const disablePassengerExportType = (): boolean => {
@@ -178,12 +153,12 @@ export const DownloadManager = ({
     <Box>
       <h1>Download Manager</h1>
       {errors.length > 0 &&
-        <Alert severity="error" sx={{mb: '1em'}}>
-          <AlertTitle>There is an issue with the options you have selected:</AlertTitle>
-          <ul style={{margin: 0}}>
-            {errors.map(((error, index) => <li key={index}>{error.message}</li>))}
-          </ul>
-        </Alert>
+          <Alert severity="error" sx={{mb: '1em'}}>
+            <AlertTitle>There is an issue with the options you have selected:</AlertTitle>
+            <ul style={{margin: 0}}>
+              {errors.map(((error, index) => <li key={index}>{error.message}</li>))}
+            </ul>
+          </Alert>
       }
 
       <Box sx={{backgroundColor: '#E6E9F1', p: 2}}>
@@ -213,35 +188,43 @@ export const DownloadManager = ({
         </Box>
 
         <DownloadPorts
-          error={errorFieldMapping.ports}
-          handlePortChange={handlePortChange}
-          handlePortCheckboxChange={handlePortCheckboxChange}
-          handlePortCheckboxGroupChange={handlePortCheckboxGroupChange}
-          handleRemovePort={handleRemovePort}
-          portsByRegion={userPortsByRegion}
-          selectedPorts={selectedPorts}
+            error={errorFieldMapping.ports}
+            handlePortChange={handlePortChange}
+            handleRemovePort={handleRemovePort}
+            onSelectedPortsChange={setSelectedPorts}
+            portsByRegion={userPortsByRegion}
+            selectedPorts={selectedPorts}
         />
 
         <h3>Passenger totals breakdown</h3>
         <Box sx={{padding: '1em', backgroundColor: '#fff'}}>
           <FormControl sx={{width: '100%', paddingBottom: '1em'}}>
             <RadioGroup
-              aria-labelledby="demo-radio-buttons-group-label"
-              defaultValue="female"
-              name="radio-buttons-group"
-              onChange={handleExportTypeChange}
-              value={exportType}
+                aria-labelledby="demo-radio-buttons-group-label"
+                defaultValue="female"
+                name="radio-buttons-group"
+                onChange={handleExportTypeChange}
+                value={exportType}
             >
               <FormControlLabel value="passengers-port" control={<Radio/>} label="By port"/>
               <FormControlLabel value="passengers-terminal" control={<Radio/>} label="By terminal"/>
               <FormControlLabel value="arrivals" control={<Radio/>} label="By flight"/>
             </RadioGroup>
           </FormControl>
-          <FormControl>
-            <FormControlLabel
-              control={<Checkbox disabled={disablePassengerExportType()} value={daily} onChange={() => setDaily(!daily)}
-                                 inputProps={{'aria-label': 'controlled'}}/>} label={'Daily passenger breakdown'}/>
-          </FormControl>
+          <Checkboxes
+              name="passenger-breakdown-frequency"
+              idPrefix="passenger-breakdown-frequency"
+              label="Breakdown frequency"
+              legendSize="s"
+              options={[{
+                value: 'daily',
+                label: 'Daily passenger breakdown',
+              }]}
+              value={daily ? ['daily'] : []}
+              onChange={values => setDaily(values.includes('daily'))}
+              disabled={disablePassengerExportType()}
+              small
+          />
         </Box>
         <Box>
         </Box>
