@@ -175,3 +175,33 @@ html {
   align-self: flex-start;
   width: fit-content;
 }
+#alerts {
+  order: -1;
+  width: 100%;
+  margin-top: 5px;
+}
+
+.the-alert {
+  display: block;
+  padding: 4px 10px;
+  margin-bottom: 3px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+}
+
+.alert-class-notice {
+  background: #adf
+}
+
+.alert-class-warning {
+  background: #faa
+}
+
+.has-alerts {
+  display: block;
+  padding: 2px 0px;
+  box-sizing: border-box;
+  text-decoration: none;
+  overflow: hidden;
+  flex-grow: 1;
+}

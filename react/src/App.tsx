@@ -28,6 +28,7 @@ import {HealthChecks} from "./components/healthchecks/HealthChecks"
 import RegionalDashboard from './components/regionalpressure/RegionalDashboard'
 import NationalDashboard from "./components/regionalpressure/NationalDashboard"
 import {Header, BottomBar, AccessibilityStatement} from '@drt/drt-react';
+import EnvironmentBanner from "./components/EnvironmentBanner";
 import {adminMenuItems} from './components/Navigation';
 import {AirportNameIndex, getAirportByCode} from './airports';
 import BorderCrossingImport from "./components/BorderCrossingImport";
@@ -114,6 +115,7 @@ export const App = () => {
   return (user.kind === "SignedInUser" && config.kind === "LoadedConfig") ?
     <div id="root">
       <div id="content">
+        <EnvironmentBanner />
         <Header
           routingFunction={routingFunction}
           logoutLink={logoutLink}
